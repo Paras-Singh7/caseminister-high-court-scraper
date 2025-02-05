@@ -167,9 +167,9 @@ if __name__ == '__main__':
                 if not result:
                     continuous_no_case += 1
                 else:
-                    result["case_info"] = f"{case_no}/{case_no}/{REQUIRED_YEAR}"
+                    result["case_info"] = f"{case_type}/{case_no}/{REQUIRED_YEAR}"
                     save_to_mongodb(result)
-                    print("Case no:", case_no, end="\r")
+                    print(f"{case_type}/{case_no}", end="\r")
 
                 if continuous_no_case == 10:
                     break

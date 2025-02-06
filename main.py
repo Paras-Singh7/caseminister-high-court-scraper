@@ -167,13 +167,13 @@ if __name__ == '__main__':
                     result = get_case_details(session, case_type, str(case_no), str(FROM_YEAR), captcha_code)
 
                     if not result:
-                        continuous_no_case += 20
+                        continuous_no_case += 1
                     else:
                         result["case_info"] = f"{case_type}/{case_no}/{FROM_YEAR}"
                         save_to_mongodb(result)
                         print(f"{case_type}/{case_no}", end="\r")
 
-                    if continuous_no_case == 10:
+                    if continuous_no_case == 20:
                         break
 
                     case_no += 1

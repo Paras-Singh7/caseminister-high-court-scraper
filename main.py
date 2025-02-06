@@ -15,7 +15,7 @@ load_dotenv()
 BASE_URL = "https://dhcappl.nic.in/dhcorderportal"
 PDF_DIR = "pdf"
 
-REQUIRED_YEAR = 2024
+FROM_YEAR = 2023
 REQUIRED_CASE_TYPES = ["RFA(OS)(COMM)", "FAO(OS) (COMM)", "EFA(OS)  (COMM)", "EFA(COMM)", "RFA(COMM)", "FAO(COMM)",
                        "CS(COMM)", "O.M.P.(I) (COMM.)", "O.M.P. (E) (COMM.)",
                        "O.M.P. (J) (COMM.)", "O.M.P. (T) (COMM.)", "O.M.P. (COMM)", "ARB. A. (COMM.)",
@@ -89,12 +89,13 @@ def parse_order_row(row: BeautifulSoup, sess: requests.Session) -> Dict[str, str
     pdf_link = cells[1].find("a")
     if pdf_link and pdf_link.get("onclick"):
         pdf_path = pdf_link["onclick"].split("'")[1]
-        temp["url"] = download_pdf(sess, pdf_path)
+
+        downloaded_file_path = download_pdf(sess, pdf_path)
+        if downloaded_file_path:
+            temp["url"] = upload_pdf_to_azure(downloaded_file_path)
+        clean_up(downloaded_file_path)
     else:
         temp["url"] = None
-
-    if temp["url"]:
-        temp["url"] = upload_pdf_to_azure(temp["url"])
 
     return temp
 
@@ -140,9 +141,9 @@ def get_case_details(sess: requests.Session, ctype: str, regno: str, regyr: str,
         return None
 
 
-def get_captcha(session: requests.Session) -> Optional[str]:
+def get_captcha(sess: requests.Session) -> Optional[str]:
     try:
-        page = session.get(f"{BASE_URL}/LaunchCaseWise.do", timeout=30)
+        page = sess.get(f"{BASE_URL}/LaunchCaseWise.do", timeout=30)
         page.raise_for_status()
         soup = BeautifulSoup(page.content, 'html.parser')
         captcha_element = soup.find("a", {"onclick": "playAudio()"})
@@ -157,24 +158,27 @@ if __name__ == '__main__':
     captcha_code = get_captcha(session)
 
     if captcha_code:
-        for case_type in REQUIRED_CASE_TYPES:
-            continuous_no_case = 0
-            case_no = 1
+        while FROM_YEAR >= 2000:
+            for case_type in REQUIRED_CASE_TYPES:
+                continuous_no_case = 0
+                case_no = 1
 
-            while True:
-                result = get_case_details(session, case_type, str(case_no), str(REQUIRED_YEAR), captcha_code)
+                while True:
+                    result = get_case_details(session, case_type, str(case_no), str(FROM_YEAR), captcha_code)
 
-                if not result:
-                    continuous_no_case += 1
-                else:
-                    result["case_info"] = f"{case_type}/{case_no}/{REQUIRED_YEAR}"
-                    save_to_mongodb(result)
-                    print(f"{case_type}/{case_no}", end="\r")
+                    if not result:
+                        continuous_no_case += 20
+                    else:
+                        result["case_info"] = f"{case_type}/{case_no}/{FROM_YEAR}"
+                        save_to_mongodb(result)
+                        print(f"{case_type}/{case_no}", end="\r")
 
-                if continuous_no_case == 10:
-                    break
+                    if continuous_no_case == 10:
+                        break
 
-                case_no += 1
+                    case_no += 1
+
+            FROM_YEAR -= 1
 
     else:
         print("Failed to retrieve captcha")
